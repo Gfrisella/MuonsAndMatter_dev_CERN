@@ -44,6 +44,8 @@ public:
     std::vector<double> stepLength;
     std::vector<double> chargeDeposit;
     std::vector<int> trackId;
+    std::vector<int> pid;
+
 
 
     void setStoreAll(bool storeAll);

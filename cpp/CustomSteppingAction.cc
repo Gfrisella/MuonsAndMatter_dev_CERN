@@ -83,6 +83,7 @@ void CustomSteppingAction::UserSteppingAction(const G4Step* step)
         y.push_back(position2.y() / m);
         z.push_back(position2.z() / m);
         trackId.push_back(track->GetTrackID());
+        pid.push_back(track->GetDefinition()->GetPDGEncoding());
 
         stepLength.push_back(step->GetStepLength() / m);
         chargeDeposit.push_back(step->GetTotalEnergyDeposit());
@@ -127,6 +128,7 @@ void CustomSteppingAction::clean() {
     stepLength.clear();
     chargeDeposit.clear();
     trackId.clear();
+    pid.clear();
 //    std::cout<<"Cleaning!"<<std::endl;
 }
 
