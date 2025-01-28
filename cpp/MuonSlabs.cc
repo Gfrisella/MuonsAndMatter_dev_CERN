@@ -142,6 +142,7 @@ py::dict collect() {
     std::vector<double>& y = steppingAction->y;
     std::vector<double>& z = steppingAction->z;
     std::vector<int>& trackId = steppingAction->trackId;
+    std::vector<int>& pdgid = steppingAction->pid;
 
     std::vector<double>& stepLength = steppingAction->stepLength;
     std::vector<double>& chargeDeposit = steppingAction->chargeDeposit;
@@ -158,6 +159,7 @@ py::dict collect() {
     std::vector<double> chargeDeposit_copy(chargeDeposit.begin(), chargeDeposit.end());
 
     std::vector<int> trackId_copy(trackId.begin(), trackId.end());
+    std::vector<int> pdgid_copy(pdgid.begin(), pdgid.end());
 
     py::array np_px = py::cast(px_copy);
     py::array np_py = py::cast(py_copy);
@@ -170,6 +172,7 @@ py::dict collect() {
     py::array np_stepLength = py::cast(stepLength_copy);
     py::array np_chargeDeposit = py::cast(chargeDeposit_copy);
     py::array np_trackId = py::cast(trackId);
+    py::array np_pdgId = py::cast(pdgid_copy);
 
     py::dict d = py::dict(
             "px"_a = np_px,
