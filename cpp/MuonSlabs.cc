@@ -183,7 +183,8 @@ py::dict collect() {
             "z"_a = np_z,
             "step_length"_a = np_stepLength,
             "charge_deposit"_a = np_chargeDeposit,
-            "track_id"_a = np_trackId
+            "track_id"_a = np_trackId,
+            "pdg_id"_a = np_pdgId
     );
 
     return d;

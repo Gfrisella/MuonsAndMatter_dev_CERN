@@ -478,7 +478,7 @@ def design_muon_shield(params,fSC_mag = True, use_field_maps = False, field_map_
             field_profile = 'uniform'
             if fieldDirection[nM] == "down":
                 ironField_s = -ironField_s
-            if nM != 0: ironField_s *= ratio_yokes[nM]
+            if nM  in [4,5,6]: ironField_s *= ratio_yokes[nM]
             magFieldIron_s = [0., ironField_s, 0.]
             RetField_s = [0., -ironField_s/ratio_yokes[nM], 0.]
             ConRField_s = [-ironField_s/ratio_yokes[nM], 0., 0.]

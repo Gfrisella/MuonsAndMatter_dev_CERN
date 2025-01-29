@@ -16,6 +16,7 @@ plots/*
 # Ignore data directory
 data/full_sample/
 data/outputs/*
+data/new_params_magnet.csv
 
 
 # Ignore checks directory
