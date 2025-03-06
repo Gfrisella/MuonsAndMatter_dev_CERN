@@ -5,7 +5,7 @@ from lib.ship_muon_shield_customfield import get_design_from_params, filter_fiel
 from lib.magnet_simulations import get_symmetry
 
 def plot_magnet(detector, 
-                output_file='plots/detector_visualization.png',
+                output_file,
                 muon_data = [], 
                 sensitive_film_position = None,
                 azim:float = 126,
@@ -245,9 +245,12 @@ def construct_and_plot(muons,
         simulate_fields = False,
         field_map_file = None,
         cavern = True,
+        output_file = 'plots/detector_visualization.png',
+        double_core = False,
         **kwargs_plot):
-    detector = get_design_from_params(params = phi,fSC_mag = fSC_mag, simulate_fields=simulate_fields, field_map_file = field_map_file, sensitive_film_params=sensitive_film_params, add_cavern=cavern)
+    detector = get_design_from_params(params = phi,fSC_mag = fSC_mag, simulate_fields=simulate_fields, field_map_file = field_map_file, sensitive_film_params=sensitive_film_params, add_cavern=cavern, extra_magnet= False, double_core = double_core)
     plot_magnet(detector,
+                output_file = output_file,
                 muon_data = muons, 
                 sensitive_film_position = sensitive_film_params['position'],#sensitive_film_params['position'], 
                 **kwargs_plot)

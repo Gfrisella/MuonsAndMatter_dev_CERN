@@ -141,7 +141,7 @@ if __name__ == '__main__':
     import pickle
     import multiprocessing as mp
     from time import time
-    from lib.reference_designs.params import sc_v6, optimal_oliver, new_parametrization, oliver_scaled, TOTAL_PARAMS
+    from lib.reference_designs.params import sc_v6, optimal_oliver, new_parametrization, oliver_scaled, Piet_solution, TOTAL_PARAMS
     import os
     from functools import partial
     parser = argparse.ArgumentParser()
@@ -162,12 +162,14 @@ if __name__ == '__main__':
     parser.add_argument("-return_nan", action = 'store_true')
     parser.add_argument("-keep_tracks_of_hits", action = 'store_true')
     parser.add_argument("-extra_magnet", action = 'store_true')
+    parser.add_argument("-double_core", action = 'store_true')
 
     args = parser.parse_args()
     cores = args.c
     if args.params == 'sc_v6': params = sc_v6
     elif args.params == 'oliver': params = optimal_oliver
     elif args.params == 'oliver_scaled': params = oliver_scaled
+    elif args.params == 'Piet_solution': params = Piet_solution
     else:
         with open(args.params, "r") as txt_file:
             params = np.array([float(line.strip()) for line in txt_file])
@@ -200,7 +202,7 @@ if __name__ == '__main__':
         args.field_file = None
     else: 
         core_fields = 8
-        detector = get_design_from_params(np.asarray(params), args.SC_mag, False,True, args.field_file, sensitive_film_params, False, True, cores_field=core_fields, extra_magnet=args.extra_magnet)
+        detector = get_design_from_params(np.asarray(params), args.SC_mag, False,True, args.field_file, sensitive_film_params, False, True, cores_field=core_fields, extra_magnet=args.extra_magnet, double_core = args.double_core)
     t2_fem = time()
 
     with gzip.open(input_file, 'rb') as f:
@@ -213,6 +215,7 @@ if __name__ == '__main__':
 
     workloads = split_array(data_n,cores)
     t1 = time()
+    '''
     with mp.Pool(cores) as pool:
         run_partial = partial(run, 
                               phi=params, 
@@ -255,6 +258,15 @@ if __name__ == '__main__':
     if args.save_data:
         with gzip.open(f'data/outputs/outputs_optimal.pkl', "wb") as f:
             pickle.dump(all_results, f)
+    '''
+    all_results = []
+    ensitive_film_params = {'dz': 0.01, 'dx': 4, 'dy': 6, 'position':82}
+    angle = 90
+    elev = 90
+    fig_name = 'ciao.png'
+    result = construct_and_plot(muons = all_results,phi = params,fSC_mag = args.SC_mag,sensitive_film_params = sensitive_film_params, simulate_fields=False, field_map_file = args.field_file, cavern = False, double_core = args.double_core, output_file= fig_name, azim = angle, elev = elev)#args.add_cavern)
+    print('the result:\n', result)
+    '''
     if args.plot_magnet:
         all_results = all_results[:1000]
         sensitive_film_params = {'dz': 0.01, 'dx': 4, 'dy': 6, 'position':82}
@@ -264,4 +276,4 @@ if __name__ == '__main__':
             plot_magnet(detector, muon_data = all_results, sensitive_film_position = sensitive_film_params['position'], azim = angle, elev = elev)
         else:
             result = construct_and_plot(muons = all_results,phi = params,fSC_mag = args.SC_mag,sensitive_film_params = sensitive_film_params, simulate_fields=False, field_map_file = args.field_file, cavern = False, azim = angle, elev = elev)#args.add_cavern)
-                                         
+                         '''                
