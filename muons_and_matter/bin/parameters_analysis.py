@@ -1,17 +1,17 @@
 import gzip
 import numpy as np
 import matplotlib.pyplot as plt
-from lib.reference_designs.params import *
+from MuonsAndMatter.muons_and_matter.lib.reference_designs.params import *
 import time
-from lib.ship_muon_shield import get_design_from_params
+from MuonsAndMatter.muons_and_matter.lib.ship_muon_shield import get_design_from_params
 import pickle
 from multiprocessing import Pool
 from matplotlib.animation import FuncAnimation
 import os
 from copy import deepcopy
 import argparse
-from muons_and_matter import run, split_array
-from plot_magnet import construct_and_plot
+from MuonsAndMatter.muons_and_matter.muons_and_matter import run, split_array
+from MuonsAndMatter.muons_and_matter.bin.plot_magnet import construct_and_plot
 
 
 DEF_INPUT_FILE = '/home/hep/lprate/projects/MuonsAndMatter/data/inputs.pkl'

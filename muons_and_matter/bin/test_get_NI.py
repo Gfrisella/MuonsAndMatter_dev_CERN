@@ -1,4 +1,4 @@
-from lib import magnet_simulations
+from MuonsAndMatter.muons_and_matter.lib import magnet_simulations
 import snoopy
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,8 +1,8 @@
 import json
 import numpy as np
-from lib.ship_muon_shield import get_design_from_params, initialize_geant4, get_field, estimate_electrical_cost, RESOL_DEF
+from MuonsAndMatter.muons_and_matter.lib.ship_muon_shield import get_design_from_params, initialize_geant4, get_field, estimate_electrical_cost, RESOL_DEF
 from muon_slabs import simulate_muon, collect, kill_secondary_tracks, collect_from_sensitive
-from bin.plot_magnet import construct_and_plot, plot_fields
+from MuonsAndMatter.muons_and_matter.bin.plot_magnet import construct_and_plot, plot_fields
 from time import time
 import h5py
 
@@ -156,11 +156,11 @@ if __name__ == '__main__':
     import argparse
     import pickle
     import multiprocessing as mp
-    import lib.reference_designs.params as params_lib
-    from lib.magnet_simulations import construct_grid, RESOL_DEF
+    import MuonsAndMatter.muons_and_matter.lib.reference_designs.params as params_lib
+    from MuonsAndMatter.muons_and_matter.lib.magnet_simulations import construct_grid, RESOL_DEF
     from functools import partial
     import os
-    DEF_INPUT_FILE = 'data/muons/subsample_biased_v4.npy'
+    DEF_INPUT_FILE = 'data/muons/full_sample_after_target.h5'
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
@@ -190,6 +190,7 @@ if __name__ == '__main__':
     parser.add_argument("-remove_target", dest="add_target", action='store_false', help="Remove target from simulation")
     parser.add_argument("-smear_beam_radius", type=float, default=5., help="Radius in cm for beam smearing")
     parser.add_argument("-n_hits", type=int, default=1, help="Minimum number of hits in sensitive planes to consider a muon as detected")
+    parser.add_argument('-TriangleCut', dest='TriangleCut', type=float, default=0, help="Triangle shape cut at the last magnet corner. Can specify value in cm")
     args = parser.parse_args()
     cores = args.c
     if args.params == 'test':
@@ -204,6 +205,8 @@ if __name__ == '__main__':
         raise ValueError(f"Invalid params: {args.params}. Must be a valid parameter name or a file path. \
                          Avaliable names: {', '.join(params_lib.params.keys())}.")
     params = np.asarray(params).reshape(-1,15)
+    params[-1][12] = args.TriangleCut
+
     print('Params to simulate:', params)
     def split_array(arr, K):
         N = len(arr)

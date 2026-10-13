@@ -4,14 +4,14 @@ import pickle
 import torch
 import h5py
 import os
-from lib.ship_muon_shield import get_design_from_params
-import lib.reference_designs.params as params_lib
+from MuonsAndMatter.muons_and_matter.lib.ship_muon_shield import get_design_from_params
+import MuonsAndMatter.muons_and_matter.lib.reference_designs.params as params_lib
 from cuda_muons import set_environment, propagate_muons_with_cuda
-from bin.plot_magnet import construct_and_plot, plot_fields
+from MuonsAndMatter.muons_and_matter.bin.plot_magnet import construct_and_plot, plot_fields
 
 assert torch.cuda.is_available(), f"CUDA is not available. Torch version: {torch.__version__} \n Torch cuda version: {print(torch.version.cuda)}"
 
-from lib.magnet_simulations import get_symmetry
+from MuonsAndMatter.muons_and_matter.lib.magnet_simulations import get_symmetry
 
 
 def get_corners_from_detector(detector, use_symmetry=True):
@@ -100,6 +100,7 @@ def run_from_params(
     return_all=False,
     SmearBeamRadius=0.0,
     seed=0,
+    NO_MCTracks = False,
     device='cuda',
 ):
     """Run muon propagation from magnet parameters (detector-based geometry).
@@ -180,16 +181,36 @@ def run_from_params(
     assert muons_charge.abs().eq(1).all(), \
         f"PDG IDs / charges must be +/-13 or +/-1. Got: {muons_charge.unique(return_counts=True)}"
 
+    
+    # Keep track of the original muon index
+    original_idx = torch.arange(
+        muons_positions.shape[0],
+        device=muons_positions.device
+    )
+
     # === PROPAGATION (per sensitive plane) ===
     planes = sensitive_plane if isinstance(sensitive_plane, list) else [sensitive_plane]
+    plane_outputs = {}
+
+    if planes is None:
+        print(f"No plane detected")
+        assert False
 
     for i, plane in enumerate(planes):
         if muons_positions.shape[0] == 0:
             print("No muons left to propagate.")
             break
 
-        sens_z = n_steps * step_length if plane is None else plane['position'] - plane['dz'] / 2
-        print(f"Using CUDA for propagation... (plane {i}, z={sens_z:.2f})")
+        sens_z = (
+            n_steps * step_length
+            if plane is None
+            else plane["position"] - plane["dz"] / 2
+        )
+
+        print(
+            f"Using CUDA for propagation... "
+            f"(plane {i}, z={sens_z:.2f})"
+        )
 
         out_position, out_momenta = propagate_muons_with_cuda(
             muons_positions,
@@ -204,47 +225,117 @@ def run_from_params(
             device,
         )
 
-        if plane is not None:
-            in_sens_plane = (
-                (out_position[:, 0].abs() < plane['dx'] / 2)
-                & (out_position[:, 1].abs() < plane['dy'] / 2)
-                & (out_position[:, 2] >= (plane['position'] - plane['dz'] / 2))
+        in_sens_plane = (
+            (out_position[:, 0].abs() < plane["dx"] / 2)
+            &
+            (out_position[:, 1].abs() < plane["dy"] / 2)
+            &
+            (
+                out_position[:, 2]
+                >= plane["position"] - plane["dz"] / 2
             )
-            print(f"Plane {i} (Z={plane['position']}): {in_sens_plane.sum().item()} muons remaining.")
-            if return_all:
-                out_momenta[~in_sens_plane] = 0.0
-            else:
-                out_momenta = out_momenta[in_sens_plane]
-                out_position = out_position[in_sens_plane]
-                muons_charge = muons_charge[in_sens_plane]
-                if weights is not None:
-                    weights = weights[in_sens_plane]
+        )
 
-        # Feed outputs as inputs for the next plane
-        muons_positions = out_position
-        muons_momenta = out_momenta
+        if return_all: 
+            in_sens_plane = torch.ones_like(in_sens_plane, dtype=torch.bool)
+
+        # Save original indices BEFORE filtering
+        original_idx = original_idx[in_sens_plane]
+        out_position = out_position[in_sens_plane]
+        out_momenta = out_momenta[in_sens_plane]
+        muons_charge = muons_charge[in_sens_plane]
+
+        if weights is not None:
+            weights = weights[in_sens_plane]
+        plane_outputs[i] = {
+            "position": out_position.clone(),
+            "momenta": out_momenta.clone(),
+            "evt_n": original_idx.clone(),
+        }
+
+        print(
+            f"Plane {i} "
+            f"(Z={plane['position']}): "
+            f"{out_position.shape[0]} muons remaining."
+        )
+    # ==================================================
+    # Keep ONLY muons that reached the final plane
+    # ==================================================
+
+    last_plane = max(plane_outputs.keys())
+    final_ids = plane_outputs[last_plane]["evt_n"]
+    print(f"Muons reaching final plane: {len(final_ids)}")
+
+    # Feed selected particles into next plane
+    muons_positions = out_position
+    muons_momenta = out_momenta
+
+    # --------------------------------------------------
+    # Build output
+    # --------------------------------------------------
+    #
+    if len(planes) == 1:
+            output = {}
+            output["x"] = muons_positions[:, 0].detach().cpu().numpy()
+            output["y"] = muons_positions[:, 1].detach().cpu().numpy()
+            output["z"] = muons_positions[:, 2].detach().cpu().numpy()
     
+            output["px"] = muons_momenta[:, 0].detach().cpu().numpy()
+            output["py"] = muons_momenta[:, 1].detach().cpu().numpy()
+            output["pz"] = muons_momenta[:, 2].detach().cpu().numpy()
+    else:
+        output = {
+                "planes": {}
+            }
+        output["evt_n"] = final_ids
 
-    # === Build output dict ===
-    out_position = out_position.cpu()
-    out_momenta = out_momenta.cpu()
-    output = {
-        'px': out_momenta[:, 0],
-        'py': out_momenta[:, 1],
-        'pz': out_momenta[:, 2],
-        'x': out_position[:, 0],
-        'y': out_position[:, 1],
-        'z': out_position[:, 2],
-        'pdg_id': muons_charge.cpu() * (-13),
-    }
+        if not NO_MCTracks:
+            
+            output["planes"][0] = {
+            
+                    "px": muons[:, 0][final_ids].detach().cpu().numpy(),
+                    "py": muons[:, 1][final_ids].detach().cpu().numpy(),
+                    "pz": muons[:, 2][final_ids].detach().cpu().numpy(),
+
+                    "x": muons[:, 3][final_ids].detach().cpu().numpy(),
+                    "y": muons[:, 4][final_ids].detach().cpu().numpy(),
+                }
+
+        for i, data in plane_outputs.items():
+            if not NO_MCTracks and i == 0: 
+                continue
+
+            ids = data["evt_n"]
+
+            # Find which particles at this plane are in final_ids
+            keep = torch.isin(ids, final_ids)
+            position = data["position"][keep].detach().cpu().numpy()
+            momenta = data["momenta"][keep].detach().cpu().numpy()
+
+            output["planes"][i] = {
+
+                "px": momenta[:, 0],
+                "py": momenta[:, 1],
+                "pz": momenta[:, 2],
+
+                "x": position[:, 0],
+                "y": position[:, 1],
+                "z": position[:, 2],
+            }
+        
+        print(output["planes"][i].keys())
+
+    output["pdg"] = muons_charge.detach().cpu().numpy()
     if weights is not None:
-        output['weight'] = weights.cpu()
+        output["weight"] = weights.detach().cpu().numpy()
+        error = torch.sqrt(torch.sum(weights**2))
         print("Number of HITS (weighted)", weights.sum().item())
-
+        print("Error", error.item())
+        
     if save_dir is not None:
         t1 = time.time()
         with open(save_dir, 'wb') as f:
-            pickle.dump(output, f)
+            pickle.dump(output, f, protocol=pickle.HIGHEST_PROTOCOL)
         print(f"Data saved to {save_dir}, took {time.time() - t1:.2f} seconds.")
     return output
 
@@ -255,6 +346,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--h', dest='histogram_dir', type=str, default='cuda_muons/data/',
                         help='Path to the histogram file')
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=42,
+        help='Random seed for reproducibility'
+    )
     parser.add_argument('-muons', '--f', dest='input_file', type=str,
                         default='data/muons/full_sample_after_target.h5',
                         help='Path to input muon file (.npy, .pkl, .h5).')
@@ -278,8 +375,24 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', dest='gpu', type=int, default=0,
                         help='GPU index to use')
     parser.add_argument('-NI_from_B', action='store_true', help='Derive NI from B')
+    parser.add_argument('-NO_MCTracks', action='store_true', help='Remove plane zero with the MCTracks.')
+    parser.add_argument('-save_dir', dest='save_dir', type=str,
+                        default='data/outputs/outputs_cuda.pkl',
+                        help='Path to save output muon file (.npy, .pkl, .h5).')
+    parser.add_argument('-field_map', dest='field_map', type=str,
+                            default=None,
+                            help='Path to field map file (.h5).')
+    parser.add_argument('-TriangleCut', dest='TriangleCut', type=float, default=0, help="Triangle shape cut at the last magnet corner. Can specify value in cm")
+    parser.add_argument(
+        '-pars_mod',
+        dest='pars_mod',
+        type=float,
+        nargs='+',
+        default=[],
+        help='Set parameters as groups of i j k: i1 j1 k1 i2 j2 k2 ...'
+    )
+    parser.add_argument( '-return_all', action='store_true', help='Return all muons, not just those reaching the final plane.')
     args = parser.parse_args()
-
     # Load params
     if args.params == 'test':
         params = eval(input("Enter the params as a Python list (e.g., [1.0, 2.0, 3.0]): "))
@@ -292,25 +405,68 @@ if __name__ == '__main__':
         raise ValueError(f"Invalid params: {args.params}. Must be a name or file path. "
                          f"Available: {', '.join(params_lib.params.keys())}.")
     params = np.asarray(params).reshape(-1, 15)
+    params[-1][12] = args.TriangleCut
+    
+    if args.pars_mod:
 
+        if len(args.pars_mod) % 3 != 0:
+            parser.error(
+                "-pars_mod must contain groups of 3 values: i j k"
+            )
+
+        for i, j, k in zip(
+            args.pars_mod[0::3],
+            args.pars_mod[1::3],
+            args.pars_mod[2::3]
+        ):
+            params[int(i)][int(j)] = k
     # Load muons
     time0 = time.time()
     input_file = args.input_file
     print(f"Loading muons from {input_file}")
-    if input_file.endswith('.npy') or input_file.endswith('.pkl'):
-        muons_iter = np.load(input_file, allow_pickle=True, mmap_mode='r')
-        muons = muons_iter[:args.n_muons].copy() if args.n_muons > 0 else muons_iter[:].copy()
-    elif input_file.endswith('.h5'):
-        with h5py.File(input_file, 'r') as f:
+    if input_file.endswith((".npy", ".pkl")):
+        muons_iter = np.load(input_file, allow_pickle=True)
+
+        n = args.n_muons if args.n_muons > 0 else None
+
+        muons = np.stack(
+            [
+                muons_iter["px"][:n],
+                muons_iter["py"][:n],
+                muons_iter["pz"][:n],
+                muons_iter["x"][:n],
+                muons_iter["y"][:n],
+                muons_iter["z"][:n],
+                muons_iter["pdg"][:n],   # note: pdg_id, not pdg
+                muons_iter["weight"][:n],   # or "weights" if that's the one you want
+            ],
+            axis=1,
+        ).astype(np.float64)
+
+        print(f"maximum x and y: {np.max(np.abs(muons[:,3])):.2f}, {np.max(np.abs(muons[:,4])):.2f}")
+
+    elif input_file.endswith(".h5"):
+        with h5py.File(input_file, "r") as f:
             n = args.n_muons if args.n_muons > 0 else None
-            muons = np.stack([f[k][:n] for k in ('px', 'py', 'pz', 'x', 'y', 'z', 'pdg', 'weight')],
-                             axis=1).astype(np.float64)
+            muons = np.stack(
+                [
+                    f["px"][:n],
+                    f["py"][:n],
+                    f["pz"][:n],
+                    f["x"][:n],
+                    f["y"][:n],
+                    f["z"][:n],
+                    f["pdg"][:n],
+                    f["weight"][:n],
+                ],
+                axis=1,
+            ).astype(np.float64)
+    # muons[:,5][muons[:,5]<0] = 0
     print(f"Loaded {muons.shape[0]} muons. Took {time.time() - time0:.2f} seconds.")
 
     # Sensitive plane
-    dx, dy = (9.0, 6.0) if args.expanded_sens_plane else (4.0, 6.0)
-    sensitive_film_params = [{'dz': 0.0001, 'dx': dx, 'dy': dy, 'position':pos} for pos in args.sens_plane] if args.sens_plane is not None else None
-
+    dx, dy = (6.0, 6.0) if args.expanded_sens_plane else (4.0, 6.0)
+    sensitive_film_params = [{'dz': 0.0001, 'dx': dy if pos in (30.6, 25.85, 29.95) else dx, 'dy': dy, 'position':pos} for pos in args.sens_plane] if args.sens_plane is not None else None
     # Run
     t_run_start = time.time()
     output = run_from_params(
@@ -322,10 +478,13 @@ if __name__ == '__main__':
         NI_from_B=args.NI_from_B,
         use_diluted=args.diluted_iron,
         add_cavern=args.add_cavern,
-        field_map_file=None,
+        field_map_file=args.field_map,
         SND=args.SND,
-        save_dir='data/outputs/outputs_cuda.pkl',
+        save_dir=args.save_dir,
         device=args.gpu,
+        seed=args.seed,
+        return_all=args.return_all,
+        NO_MCTracks=args.NO_MCTracks
     )
     print(f"Run completed in {time.time() - t_run_start:.2f} seconds.")
 

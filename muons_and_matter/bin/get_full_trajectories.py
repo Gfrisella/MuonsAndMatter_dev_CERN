@@ -1,8 +1,8 @@
 import json
 import numpy as np
-from lib.ship_muon_shield import get_design_from_params, initialize_geant4, get_field
+from MuonsAndMatter.muons_and_matter.lib.ship_muon_shield import get_design_from_params, initialize_geant4, get_field
 from muon_slabs import simulate_muon, collect, kill_secondary_tracks, collect_from_sensitive
-from muons_and_matter.bin.plot_magnet import construct_and_plot, plot_fields
+from MuonsAndMatter.muons_and_matter.bin.plot_magnet import construct_and_plot, plot_fields
 from time import time
 import h5py
 
@@ -133,8 +133,8 @@ if __name__ == '__main__':
     import gzip
     import pickle
     import multiprocessing as mp
-    import lib.reference_designs.params as params_lib
-    from lib.magnet_simulations import construct_grid, RESOL_DEF
+    import MuonsAndMatter.muons_and_matter.lib.reference_designs.params as params_lib
+    from MuonsAndMatter.muons_and_matter.lib.magnet_simulations import construct_grid, RESOL_DEF
     from functools import partial
     import os
     

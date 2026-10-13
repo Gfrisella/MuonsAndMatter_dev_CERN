@@ -1,5 +1,5 @@
-from lib import magnet_simulations
-import lib.reference_designs.params as params_lib
+from MuonsAndMatter.muons_and_matter.lib import magnet_simulations
+import MuonsAndMatter.muons_and_matter.lib.reference_designs.params as params_lib
 import os
 import numpy as np
 

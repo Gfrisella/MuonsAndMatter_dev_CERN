@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from lib.ship_muon_shield import get_design_from_params
-from lib.magnet_simulations import get_symmetry
+from MuonsAndMatter.muons_and_matter.lib.ship_muon_shield import get_design_from_params
+from MuonsAndMatter.muons_and_matter.lib.magnet_simulations import get_symmetry
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
@@ -173,19 +173,21 @@ def plot_magnet(detector,
                 field = [0.,0.,0.]
             else: field = np.mean(component['field'][1],axis=0)
             B_th = 0.7
-            if field[1] < -B_th:
-                col = 'red'
-            elif field[1] > B_th:
-                col = 'green'
-            elif field[0] < -B_th:
-                col = 'red'
-            elif field[0] > B_th:
-                col = 'green'
-            elif field[2] < -B_th:
-                col = 'blue'
-            elif field[2] > B_th:
-                col = 'blue'
-            else: col = 'grey'
+            # if field[1] < -B_th:
+            #     col = 'red'
+            # elif field[1] > B_th:
+            #     col = 'green'
+            # elif field[0] < -B_th:
+            #     col = 'red'
+            # elif field[0] > B_th:
+            #     col = 'green'
+            # elif field[2] < -B_th:
+            #     col = 'blue'
+            # elif field[2] > B_th:
+            #     col = 'blue'
+            # else: col = 'grey'
+
+            col = 'blue'
 
             corners = np.array(
                 [

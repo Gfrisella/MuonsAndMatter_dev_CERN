@@ -301,7 +301,7 @@ def simulate_field(params,
 
 
 if __name__ == '__main__':
-    from bin.plot_magnet import plot_fields
+    from MuonsAndMatter.muons_and_matter.bin.plot_magnet import plot_fields
     import argparse
     parser = argparse.ArgumentParser(description='Simulate the magnetic field for the given parameters.')
     parser.add_argument('--hybrid', action='store_true', help='Use hybrid magnet (SC + normal conducting). Default is False.')
